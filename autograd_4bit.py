@@ -194,26 +194,27 @@ def model_to_float(model):
             m.bias = m.bias.float()
     print('Converted as Float.')
 
-def load_opt_model_4bit_low_ram(config_path, model_path, half=False):
+
+def load_auto_model_4bit_low_ram(config_path, model_path, half=False):
     import transformers
     import accelerate
-    from transformers import OPTConfig, OPTForCausalLM, AutoTokenizer
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     from modelutils import find_layers
-    print("Loading Model ...")
+    print("Loading Auto Model ...")
     t0 = time.time()
 
     with accelerate.init_empty_weights():
-        config = OPTConfig.from_pretrained(config_path)
+        config = AutoConfig.from_pretrained(config_path)
         torch.set_default_dtype(torch.half)
         transformers.modeling_utils._init_weights = False
         torch.set_default_dtype(torch.half)
-        model = OPTForCausalLM(config)
+        model = AutoModelForCausalLM.from_config(config)
         torch.set_default_dtype(torch.float)
         model = model.eval()
         layers = find_layers(model)
         for name in ['lm_head']:
-            if name in layers:
-                del layers[name]
+           if name in layers:
+              del layers[name]
         make_quant_for_4bit_autograd(model, layers)
     model = accelerate.load_checkpoint_and_dispatch(model=model, checkpoint=model_path, device_map='auto')
     model.cuda()
@@ -227,8 +228,7 @@ def load_opt_model_4bit_low_ram(config_path, model_path, half=False):
 
     print(f"Loaded the model in {(time.time()-t0):.2f} seconds.")
     
-    return model, tokenizer
-    
+    return model, tokenizer    
 
 def load_llama_model_4bit_low_ram(config_path, model_path, half=False):
     import transformers
@@ -236,7 +236,7 @@ def load_llama_model_4bit_low_ram(config_path, model_path, half=False):
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
     from modelutils import find_layers
     
-    print("Loading Model ...")
+    print("Loading Llama Model ...")
     t0 = time.time()
 
     with accelerate.init_empty_weights():
