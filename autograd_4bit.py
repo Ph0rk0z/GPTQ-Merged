@@ -212,9 +212,12 @@ def load_auto_model_4bit_low_ram(config_path, model_path, half=False):
         torch.set_default_dtype(torch.float)
         model = model.eval()
         layers = find_layers(model)
-        for name in ['lm_head']:
+        for name in ['embed_out', 'lm_head']:
            if name in layers:
               del layers[name]
+#        for name in ['lm_head']:
+#           if name in layers:
+#               del layers[name]
         make_quant_for_4bit_autograd(model, layers)
     model = accelerate.load_checkpoint_and_dispatch(model=model, checkpoint=model_path, device_map='auto')
     model.cuda()
