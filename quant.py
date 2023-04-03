@@ -137,6 +137,21 @@ class QuantLinear(nn.Module):
         self.register_buffer(
             'qweight', torch.zeros((infeatures // 256 * (bits * 8), outfeatures), dtype=torch.int)
         )
+        if self.bits == 4:
+            self.register_buffer('wf1', torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(2), persistent=False)
+            self.register_buffer('wf2', torch.tensor([0, 4, 8, 12, 16, 20, 24, 28], dtype=torch.int32).unsqueeze(0).unsqueeze(0), persistent=False)
+        elif self.bits == 3:
+            self.register_buffer('wf1', torch.tensor([
+                [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+            ], dtype=torch.int32).reshape(1,3,12,1), persistent=False)
+            self.register_buffer('wf2', torch.tensor([
+                [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+            ], dtype=torch.int32).reshape(1,1,3,12), persistent=False)
+
 
     def pack(self, linear, scales, zeros):
         self.zeros = zeros * scales
@@ -187,6 +202,54 @@ class QuantLinear(nn.Module):
         outshape = list(x.shape)
         x = x.reshape(-1, x.shape[-1])
         y = self.bias.clone().repeat(x.shape[0],1)
+        if x.shape[-2] >= 128 and self.bias == None:
+            # Fall back to PyTorch matmul
+            if self.bits == 4 :
+                # Unpack 4bit weights
+                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 8, -1), self.wf1).to(torch.int8)
+                torch.bitwise_and(weight, 0x0000000F, out=weight)
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+
+                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 8), self.wf2).to(torch.int8)
+                torch.bitwise_and(zeros, 0x0000000F, out=zeros)
+                zeros = zeros + 1
+                zeros = zeros.reshape(-1, zeros.shape[1] * zeros.shape[2])
+
+                scales = self.scales
+
+                weights = (scales * (weight - zeros))
+                weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
+                x = torch.matmul(x, weights.to(x.dtype))
+                return x
+            if self.bits == 3:
+                # Unpack 3bit weights
+
+                weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
+                weight = (weight >> self.wf1)&0x7
+                weight[:,0,10] = (weight[:,0,10]&0x3) | ((weight[:,1,0] << 2)&0x4)
+                weight[:,1,11] = (weight[:,1,11]&0x1) | ((weight[:,2,0] << 1)&0x6)
+                weight = weight & 0x7
+                weight = torch.cat([weight[:,0,:11], weight[:,1,1:12], weight[:,2,1:11]], dim=1)
+                weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+
+                zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
+                zeros = (zeros >> self.wf2)
+                zeros[:,:,0,10] = (zeros[:,:,0,10]&0x3) | ((zeros[:,:,1,0] << 2)&0x4)
+                zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
+                zeros = zeros & 0x7
+                zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+                zeros = zeros + 1
+
+                scales = self.scales
+                scales = scales.reshape(-1, 1, scales.shape[-1])
+
+                weights = (scales * (weight - zeros))
+                weights = weights.reshape(weights.shape[0] * weight.shape[1], weights.shape[2])
+                x = torch.matmul(x, weights.to(x.dtype))
+
+                return x
+
         outshape[-1] = self.bias.numel()
         dtype = x.dtype
         x = x.float()
