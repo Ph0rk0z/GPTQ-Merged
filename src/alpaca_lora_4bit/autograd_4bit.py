@@ -304,7 +304,7 @@ def load_auto_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=Fal
 
     with accelerate.init_empty_weights():
         config = AutoConfig.from_pretrained(config_path)
-        model = AutoModelForCausalLM(config)
+        model = AutoModelForCausalLM.from_config(config)
         model = model.eval()
         layers = find_layers(model)
         for name in ['embed_out', 'lm_head']:
@@ -342,7 +342,7 @@ def load_auto_model_4bit_low_ram_and_offload(config_path, model_path, lora_path=
 
     with accelerate.init_empty_weights():
         config = AutoConfig.from_pretrained(config_path)
-        model = AutoModelForCausalLM(config)
+        model = AutoModelForCausalLM.from_config(config)
         model = model.eval()
         layers = find_layers(model)
         for name in ['embed_out', 'lm_head']:
