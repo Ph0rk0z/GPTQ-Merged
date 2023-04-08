@@ -1,0 +1,3 @@
+[submodule "src/src/alpaca_lora_4bit"]
+	path = src/src/alpaca_lora_4bit
+	url = https://github.com/johnsmith0031/alpaca_lora_4bit
