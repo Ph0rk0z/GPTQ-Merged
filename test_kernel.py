@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import quant_cuda
+from gptq_llama import quant_cuda
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
@@ -94,7 +94,7 @@ print('Verifiying kernel correctness ...')
 M = 4096
 N = 11008
 
-from quant import *
+from gptq_llama.quant import *
 
 layer = nn.Linear(M, N)
 vec = torch.randn(B,L,M).to(DEV)

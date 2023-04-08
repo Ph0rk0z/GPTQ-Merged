@@ -3,27 +3,28 @@ import time
 import torch
 import torch.nn as nn
 
-from gptq import *
-from modelutils import *
-from quant import *
+from .gptq import *
+from .modelutils import *
+from .quant import *
 
 from transformers import AutoTokenizer
 
 DEV = torch.device('cuda:0')
 import copy 
-from transformers.models.gptj.modeling_gptj import GPTJModel,GPTJConfig
+from transformers.models.llama.modeling_llama import LlamaModel,LlamaConfig
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from typing import List, Optional, Tuple, Union
 import time
 
-class Offload_GPTJModel(GPTJModel):
-    def __init__(self, config: GPTJConfig):
+class Offload_LlamaModel(LlamaModel):
+    def __init__(self, config: LlamaConfig):
         super().__init__(config)
 
     def forward(
         self,
         input_ids: torch.LongTensor = None,
         attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
@@ -44,6 +45,10 @@ class Offload_GPTJModel(GPTJModel):
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
                 [What are attention masks?](../glossary#attention-mask)
+            position_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range
+                `[0, config.n_positions - 1]`.
+                [What are position IDs?](../glossary#position-ids)
             past_key_values (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
                 Tuple of `tuple(torch.FloatTensor)` of length `config.n_layers`, with each tuple having 2 tensors of
                 shape `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of
@@ -90,14 +95,24 @@ class Offload_GPTJModel(GPTJModel):
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
             seq_length_with_past = seq_length_with_past + past_key_values_length
-            
+
+        if position_ids is None:
+            device = input_ids.device if input_ids is not None else inputs_embeds.device
+            position_ids = torch.arange(
+                past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
+            )
+            position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
+        else:
+            position_ids = position_ids.view(-1, seq_length).long()
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
         # embed positions
         if attention_mask is None:
-            torch.ones((batch_size, seq_length_with_past), dtype=torch.bool, device=inputs_embeds.device	)
-
+            attention_mask = torch.ones(
+                (batch_size, seq_length_with_past), dtype=torch.bool, device=inputs_embeds.device
+            )
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
         )
@@ -140,12 +155,14 @@ class Offload_GPTJModel(GPTJModel):
                     create_custom_forward(decoder_layer),
                     hidden_states,
                     attention_mask,
+                    position_ids,
                     None,
                 )
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
+                    position_ids=position_ids,
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
@@ -182,9 +199,9 @@ class Offload_GPTJModel(GPTJModel):
         )
 
 def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
-    transformers.models.gptj.modeling_gptj.GPTJModel = Offload_GPTJModel
-    from transformers import GPTJConfig, GPTJForCausalLM 
-    config = GPTJConfig.from_pretrained(model)
+    transformers.models.llama.modeling_llama.LlamaModel = Offload_LlamaModel
+    from transformers import LlamaConfig, LlamaForCausalLM 
+    config = LlamaConfig.from_pretrained(model)
     def noop(*args, **kwargs):
         pass
     torch.nn.init.kaiming_uniform_ = noop 
@@ -194,7 +211,7 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
     torch.set_default_dtype(torch.half)
     transformers.modeling_utils._init_weights = False
     torch.set_default_dtype(torch.half)
-    model = GPTJForCausalLM(config)
+    model = LlamaForCausalLM(config)
     torch.set_default_dtype(torch.float)
     model = model.eval()
     layers = find_layers(model)
@@ -206,9 +223,9 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
     print('Loading model ...')
     if checkpoint.endswith('.safetensors'):
         from safetensors.torch import load_file as safe_load
-        model.load_state_dict(safe_load(checkpoint), strict = False)
+        model.load_state_dict(safe_load(checkpoint))
     else:
-        model.load_state_dict(torch.load(checkpoint), strict = False)
+        model.load_state_dict(torch.load(checkpoint))
     model.seqlen = 2048
     
     for i in range(pre_layer):
@@ -228,7 +245,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         'model', type=str,
-        help='gptj model to load'
+        help='llama model to load'
     )
     parser.add_argument(
         '--wbits', type=int, default=4, choices=[2, 3, 4, 8],
