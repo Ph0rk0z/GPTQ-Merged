@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 import gptj
 
-from gptq import *
-from modelutils import *
-from quant import *
+from .gptq import *
+from .modelutils import *
+from .quant import *
 
 from transformers import AutoTokenizer
 
