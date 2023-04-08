@@ -1,5 +1,12 @@
+<<<<<<< HEAD
 __pycache__
 build
 dist
 *.egg-info
 venv
+=======
+build
+__pycache__
+gptq_llama.egg-info
+*.so
+>>>>>>> b176209c6d041c268993efaf62165999c525d4f5
