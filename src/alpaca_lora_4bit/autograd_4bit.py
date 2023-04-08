@@ -292,3 +292,41 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
     return model, tokenizer
 
 load_llama_model_4bit_low_ram_and_offload_to_cpu = load_llama_model_4bit_low_ram_and_offload
+
+
+def load_llama_auto_4bit_low_ram(config_path, model_path, groupsize=-1, half=False, device_map="auto", seqlen=2048):
+    import accelerate
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+    print(Style.BRIGHT + Fore.CYAN + "Loading Auto Model ...")
+    t0 = time.time()
+
+    with accelerate.init_empty_weights():
+        config = AutoConfig.from_pretrained(config_path)
+        model = AutoModelForCausalLM(config)
+        model = model.eval()
+        layers = find_layers(model)
+        for name in ['embed_out', 'lm_head']:
+            if name in layers:
+                del layers[name]
+        make_quant_for_4bit_autograd(model, layers, groupsize=groupsize)
+    model = accelerate.load_checkpoint_and_dispatch(
+        model=model,
+        checkpoint=model_path,
+        device_map=device_map,
+        #no_split_module_classes=["LlamaDecoderLayer"]
+    )
+
+    model.seqlen = seqlen
+
+    if half:
+        model_to_half(model)
+
+    tokenizer = AutoTokenizer.from_pretrained(config_path)
+    tokenizer.truncation_side = 'left'
+
+    print(Style.BRIGHT + Fore.GREEN + f"Loaded the model in {(time.time()-t0):.2f} seconds.")
+
+    return model, tokenizer
+
+
