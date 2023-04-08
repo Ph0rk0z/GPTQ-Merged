@@ -236,7 +236,11 @@ def load_quant(model, checkpoint, wbits):
     make_quant(model, layers, wbits)
 
     print('Loading model ...')
-    model.load_state_dict(torch.load(checkpoint))
+    if checkpoint.endswith('.safetensors'):
+        from safetensors.torch import load_file as safe_load
+        model.load_state_dict(safe_load(checkpoint))
+    else:
+        model.load_state_dict(torch.load(checkpoint))
     model.seqlen = model.config.max_position_embeddings
     print('Done.')
     return model
@@ -364,6 +368,10 @@ if __name__ == '__main__':
         help='Save quantized checkpoint under this name.'
     )
     parser.add_argument(
+        '--save_safetensors', type=str, default='',
+        help='Save quantized `.safetensors` checkpoint under this name.'
+    )
+    parser.add_argument(
         '--load', type=str, default='',
         help='Load quantized model.'
     )
@@ -415,3 +423,8 @@ if __name__ == '__main__':
     if args.save:
         gptj_pack(model, quantizers, args.wbits)
         torch.save(model.state_dict(), args.save) 
+
+    if args.save_safetensors:
+        gptj_pack(model, quantizers, args.wbits)
+        from safetensors.torch import save_file as safe_save
+        safe_save(model.state_dict(), args.save_safetensors)
