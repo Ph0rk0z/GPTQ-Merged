@@ -130,7 +130,8 @@ class Quantizer(nn.Module):
 
 
 try:
-    from . import quant_cuda
+     from gptq_llama import quant_cuda
+ 
 except:
     print('CUDA extension not installed.')
 

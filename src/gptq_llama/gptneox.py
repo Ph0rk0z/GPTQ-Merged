@@ -4,9 +4,9 @@ import time
 import torch
 import torch.nn as nn
 
-from gptq import *
-from modelutils import *
-from quant import *
+from .gptq import *
+from .modelutils import *
+from .quant import *
 
 
 def get_gptneox(model):
