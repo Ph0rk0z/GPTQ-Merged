@@ -297,15 +297,16 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros) 
 
     def forward(self, x):
+        kernel_switch = not self.kernel_switch_threshold is None and (x.shape[0] * x.shape[1]) >= self.kernel_switch_threshold
         if not self._initialized_quant_state:
             # Do we even have a bias? Check for at least one non-zero element.
             if self.bias is not None and bool(torch.any(self.bias != 0)):
                 # Then make sure it's the right type.
-                self.bias.data = self.bias.data.to(torch.float32)
+                self.bias.data = self.bias.data.to(torch.float32 if not kernel_switch else torch.float16)
             else:
                 self.bias = None
 
-        if not self.kernel_switch_threshold is None and (x.shape[0] * x.shape[1]) >= self.kernel_switch_threshold:
+        if kernel_switch:
             if self.bits == 2:
                 # Unpack 2bit weights
                 
