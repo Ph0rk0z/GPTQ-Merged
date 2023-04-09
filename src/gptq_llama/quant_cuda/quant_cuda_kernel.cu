@@ -30,6 +30,10 @@ __device__ double atomicAdd(
 }
 #endif
 
+__device__ inline int as_int(int i) {
+  return *reinterpret_cast<int*>(&i);
+}
+
 template <typename scalar_t>
 __global__ void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,
@@ -124,12 +128,12 @@ __global__ void VecQuant4MatMulKernelFaster(
            float* __restrict__ mul,
     const  float* __restrict__ scales,
     const    int* __restrict__ zeros,
+    const    int* __restrict__ g_idx,
     int batch,
     int vec_height, 	
     int height,
     int width,
-    int zero_width,
-    int groupsize
+    int zero_width
 );
 
 const int BLOCKWIDTH  = 256;
@@ -825,7 +829,7 @@ void vecquant4matmul_faster_cuda(
   torch::Tensor mul,
   torch::Tensor scales,
   torch::Tensor zeros,
-  int groupsize,
+  torch::Tensor g_idx,
   int vec_height
 ) {
   int batch = vec.size(0);
@@ -846,7 +850,8 @@ void vecquant4matmul_faster_cuda(
     mul.data_ptr<float>(),
     scales.data_ptr<float>(),
     zeros.data_ptr<int>(),
-    batch, vec_height, height, width, zero_width, groupsize
+    g_idx.data_ptr<int>(),
+    batch, vec_height, height, width, zero_width
   );
 }
 
@@ -856,12 +861,12 @@ __global__ void VecQuant4MatMulKernelFaster(
            float* __restrict__ mul,
     const  float* __restrict__ scales,
     const  	 int* __restrict__ zeros,
-	int batch,
-	int vec_height,
+    const  	 int* __restrict__ g_idx,
+	  int batch,
+	  int vec_height,
     int height,
     int width,
-    int zero_width,
-    int groupsize
+    int zero_width
 ) {
   const int blockwidth2 = BLOCKWIDTH / 2;
   int b = blockIdx.z;
@@ -896,8 +901,8 @@ __global__ void VecQuant4MatMulKernelFaster(
   __syncthreads();
 
   while (k < blockwidth2) {
-    int g = (g_h + (k * 2)) / groupsize;
-	float scale_f = scales[g * width + w];
+    int g = as_int(g_idx[g_h + (k * 2)]);
+	  float scale_f = scales[g * width + w];
     half2 scale = __float2half2_rn(scale_f);
     half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1)));
 	
@@ -973,17 +978,17 @@ __global__ void VecQuant4ReconsV2Kernel(
            scalar_t* __restrict__ res,
     const  scalar_t* __restrict__ scales,
     const       int* __restrict__ zeros,
+    const       int* __restrict__ g_idx,
     int height,
     int width,
-    int zero_width,
-    int groupsize
+    int zero_width
 ) {
   int b = blockIdx.z;
   int h = BLOCKHEIGHT4 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
   int n_rows = h * 8 + b;
   int n_cols = w;
-  int z_rows = n_rows / groupsize;
+  int z_rows = as_int(g_idx[n_rows]);
   int z_cols = n_cols / 8;
   int z_shift = (n_cols % 8) * 4;
   scalar_t scale = scales[z_rows * width + n_cols];
@@ -1000,7 +1005,7 @@ void vecquant4recons_v2_cuda(
   torch::Tensor res,
   torch::Tensor scales,
   torch::Tensor zeros,
-  int groupsize
+  torch::Tensor g_idx
 ) {
   int batch = BLOCKWIDTH;
   int height = mat.size(0);
@@ -1019,7 +1024,7 @@ void vecquant4recons_v2_cuda(
       VecQuant4ReconsV2Kernel<<<blocks, threads>>>(
         mat.data<int>(), res.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(),
-        height, width, zero_width, groupsize
+        g_idx.data<int>(), height, width, zero_width
       );
     })
   );

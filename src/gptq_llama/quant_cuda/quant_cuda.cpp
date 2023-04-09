@@ -95,16 +95,16 @@ void vecquant3matmul_faster(
 void vecquant4matmul_faster_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
   torch::Tensor scales, torch::Tensor zeros,
-  int groupsize, int vec_height
+  torch::Tensor g_idx, int vec_height
 ); 
 
 void vecquant4matmul_faster(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
   torch::Tensor scales, torch::Tensor zeros,
-  int groupsize, int vec_height
+  torch::Tensor g_idx, int vec_height
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant4matmul_faster_cuda(vec, mat, mul, scales, zeros, groupsize, vec_height);
+  vecquant4matmul_faster_cuda(vec, mat, mul, scales, zeros, g_idx, vec_height);
 }
 
 void vecquant4recons_v1_cuda(
@@ -122,14 +122,14 @@ void vecquant4recons_v1(
 void vecquant4recons_v2_cuda(
   torch::Tensor mat, torch::Tensor res,
   torch::Tensor scales, torch::Tensor zeros,
-  int groupsize
+  torch::Tensor g_idx
 );
 
 void vecquant4recons_v2(
-  torch::Tensor mat, torch::Tensor res, torch::Tensor scales, torch::Tensor zeros, int groupsize
+  torch::Tensor mat, torch::Tensor res, torch::Tensor scales, torch::Tensor zeros, torch::Tensor g_idx
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(scales));
-  vecquant4recons_v2_cuda(mat, res, scales, zeros, groupsize);
+  vecquant4recons_v2_cuda(mat, res, scales, zeros, g_idx);
 }
 
 void vecquant4matmul_v1_faster_cuda(

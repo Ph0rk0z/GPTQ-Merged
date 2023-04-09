@@ -3,7 +3,7 @@ from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
 setup(
     name='gptq_llama',
-    version='0.1',
+    version='0.2',
     description='GPTQ for Llama',
     package_dir={'': 'src'},
     packages=['gptq_llama', 'gptq_llama.quant_cuda'],
