@@ -92,7 +92,7 @@ class LlamaAttention(nn.Module):
                                                         position_ids)
         # [bsz, nh, t, hd]
         assert not output_attentions, "output_attentions is not supported"
-        assert not use_cache, "use_cache is not supported"
+        #assert not use_cache, "use_cache is not supported"
         assert past_key_value is None, "past_key_value is not supported"
 
         # Flash attention codes from
