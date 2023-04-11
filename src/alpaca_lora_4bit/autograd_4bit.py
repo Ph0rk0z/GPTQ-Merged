@@ -312,7 +312,7 @@ def load_auto_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=Fal
         model=model,
         checkpoint=model_path,
         device_map=device_map,
-        #no_split_module_classes=["LlamaDecoderLayer"]
+        no_split_module_classes=["LlamaDecoderLayer","GPTJBlock","OPTDecoderLayer", "GPTNeoXLayer"]
     )
 
     model.seqlen = seqlen
@@ -372,7 +372,7 @@ def load_auto_model_4bit_low_ram_and_offload(config_path, model_path, lora_path=
             m.bias = m.bias.half()
 
     print('Dispatching model ...')
-    device_map = accelerate.infer_auto_device_map(model, max_memory=max_memory)
+    device_map = accelerate.infer_auto_device_map(model, max_memory=max_memory, no_split_module_classes=["LlamaDecoderLayer", "GPTJBlock", "OPTDecoderLayer", "GPTNeoXLayer"])
     model = accelerate.dispatch_model(model, device_map=device_map, offload_buffers=True, main_device=0)
     torch.cuda.empty_cache()
     print(Style.BRIGHT + Fore.YELLOW + 'Total {:.2f} Gib VRAM used.'.format(torch.cuda.memory_allocated() / 1024 / 1024))
