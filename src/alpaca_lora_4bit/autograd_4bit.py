@@ -186,7 +186,7 @@ def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
 def load_llama_model_4bit_low_ram(config_path, model_path, groupsize=-1, half=False, device_map="auto", seqlen=2048, is_v1_model=False):
     import accelerate
     from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
-    #switch_backend_to('cuda')
+    #switch_backend_to('triton')
     print(Style.BRIGHT + Fore.CYAN + "Loading Model ...")
     t0 = time.time()
 
@@ -264,6 +264,7 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
 
     print('Dispatching model ...')
     device_map = accelerate.infer_auto_device_map(model, max_memory=max_memory, no_split_module_classes=["LlamaDecoderLayer"])
+    print("Using the following device map for the quantized model:", device_map)
     model = accelerate.dispatch_model(model, device_map=device_map, offload_buffers=True, main_device=0)
     torch.cuda.empty_cache()
     print(Style.BRIGHT + Fore.YELLOW + 'Total {:.2f} Gib VRAM used.'.format(torch.cuda.memory_allocated() / 1024 / 1024))
@@ -373,6 +374,7 @@ def load_auto_model_4bit_low_ram_and_offload(config_path, model_path, lora_path=
 
     print('Dispatching model ...')
     device_map = accelerate.infer_auto_device_map(model, max_memory=max_memory, no_split_module_classes=["LlamaDecoderLayer", "GPTJBlock", "OPTDecoderLayer", "GPTNeoXLayer"])
+    print("Using the following device map for the quantized model:", device_map)
     model = accelerate.dispatch_model(model, device_map=device_map, offload_buffers=True, main_device=0)
     torch.cuda.empty_cache()
     print(Style.BRIGHT + Fore.YELLOW + 'Total {:.2f} Gib VRAM used.'.format(torch.cuda.memory_allocated() / 1024 / 1024))
