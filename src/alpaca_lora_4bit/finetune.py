@@ -20,6 +20,9 @@
 from arg_parser import get_config
 ft_config = get_config()
 
+from monkeypatch.peft_tuners_lora_monkey_patch import replace_peft_model_with_gptq_lora_model
+replace_peft_model_with_gptq_lora_model()
+
 if ft_config.flash_attention:
     from monkeypatch.llama_flash_attn_monkey_patch import replace_llama_attn_with_flash_attn
     replace_llama_attn_with_flash_attn()
@@ -34,15 +37,15 @@ else:
     autograd_4bit.switch_backend_to('cuda')
 
 import sys
+import os
 
 import peft
 import peft.tuners.lora
-assert peft.tuners.lora.is_gptq_available()
 
 import torch
 import transformers
 from autograd_4bit import load_llama_model_4bit_low_ram
-from peft import LoraConfig, get_peft_model, get_peft_model_state_dict, PeftModel
+from peft import LoraConfig, get_peft_model, get_peft_model_state_dict, PeftModel, set_peft_model_state_dict
 
 # ! Config
 import train_data
@@ -82,7 +85,7 @@ else:
         else:
             device_map = {'': 0}
     print('Device map for lora:', device_map)
-    model = PeftModel.from_pretrained(model, ft_config.lora_apply_dir, device_map=device_map, torch_dtype=torch.float32)
+    model = PeftModel.from_pretrained(model, ft_config.lora_apply_dir, device_map=device_map, torch_dtype=torch.float32, is_trainable=True)
     print(ft_config.lora_apply_dir, 'loaded')
 
 
@@ -166,9 +169,14 @@ if not ft_config.skip:
     # Run Trainer
     if ft_config.resume_checkpoint:
         print('Resuming from {} ...'.format(ft_config.resume_checkpoint))
+        state_dict_peft = torch.load(os.path.join(ft_config.resume_checkpoint, 'pytorch_model.bin'), map_location='cpu')
+        set_peft_model_state_dict(model, state_dict_peft)
         trainer.train(ft_config.resume_checkpoint)
     else:
         trainer.train()
+
+    # Restore old model state dict
+    model.state_dict = old_state_dict
 
     print('Train completed.')
 
