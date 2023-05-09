@@ -9,7 +9,7 @@ use_new = True
 auto_switch = True
 auto_switch_thd = 8
 debug = False
-faster = True
+faster = False
 cache_buffer = True
 
 def get_buffer(shape_of_qweight, dtype=torch.float16, device='cuda'):
@@ -70,7 +70,7 @@ def _matmul4bit_v2(x, qweight, scales, zeros, g_idx):
         quant_cuda.vecquant4matmul_faster(x, qweight, y, scales, zeros, g_idx, x.shape[-1] // 2)
     else:
         x = x.float()
-        quant_cuda.vecquant4matmul(x, qweight, y, scales, zeros, g_idx)
+        quant_cuda.vecquant4matmul_slower(x, qweight, y, scales, zeros, g_idx)
     y = y.to(dtype)
     return y.reshape(outshape)
 
