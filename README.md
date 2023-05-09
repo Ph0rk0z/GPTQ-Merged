@@ -1,3 +1,17 @@
+
+This is a merge of:
+
+https://github.com/sterlind/GPTQ-for-LLaMa/commits/lora_4bit
+
+https://github.com/johnsmith0031/alpaca_lora_4bit
+
+https://github.com/0cc4m/GPTQ-for-LLaMa
+
+Mixed and matched to suit.
+
+It supports opt, gpt-j, gpt-neox and llama
+
+
 # GPTQ-for-LLaMA
 4 bits quantization of [LLaMA](https://arxiv.org/abs/2302.13971) using [GPTQ](https://arxiv.org/abs/2210.17323)
 
