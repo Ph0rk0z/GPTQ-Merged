@@ -2,7 +2,9 @@
 This is a merge of:
 
 https://github.com/sterlind/GPTQ-for-LLaMa/commits/lora_4bit
+
 https://github.com/johnsmith0031/alpaca_lora_4bit
+
 https://github.com/0cc4m/GPTQ-for-LLaMa
 
 Mixed and matched to suit.
