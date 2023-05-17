@@ -248,7 +248,8 @@ def load_quant(model, checkpoint, wbits, groupsize, pre_layer):
             model.model.layers[i].target_device = target
         last_layer = dev_layer
     for i in range(last_layer, len(model.model.layers)):
-        model.model.layers[i].target_device = torch.device('cpu')    model.model.embed_tokens.to(DEV)
+        model.model.layers[i].target_device = torch.device('cpu')
+    model.model.embed_tokens.to(DEV)
     model.model.norm.to(DEV)
     model.lm_head.to(DEV)
     model.model.preload = last_layer
