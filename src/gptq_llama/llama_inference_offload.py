@@ -134,7 +134,7 @@ class Offload_LlamaModel(LlamaModel):
         for idx in range(len(self.layers)):
             if idx <= (self.preload - 1):
                 decoder_layer = self.layers[idx]
-                target_device = decoder_layer.target_devi
+                target_device = decoder_layer.target_device
             else:
                 decoder_layer = self.layers[idx].to(DEV)
                 target_device = DEV
