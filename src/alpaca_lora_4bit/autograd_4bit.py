@@ -249,6 +249,9 @@ def load_llama_model_4bit_low_ram_and_offload(config_path, model_path, lora_path
             break
 
     if lora_path is not None:
+        # Apply Monkey Patch
+        from monkeypatch.peft_tuners_lora_monkey_patch import replace_peft_model_with_gptq_lora_model
+        replace_peft_model_with_gptq_lora_model()
         from peft import PeftModel
         from peft.tuners.lora import Linear4bitLt
         model = PeftModel.from_pretrained(model, lora_path, device_map={'': 'cpu'}, torch_dtype=torch.float32, is_trainable=True)
@@ -359,6 +362,9 @@ def load_auto_model_4bit_low_ram_and_offload(config_path, model_path, lora_path=
             break
 
     if lora_path is not None:
+        # Apply Monkey Patch
+        from monkeypatch.peft_tuners_lora_monkey_patch import replace_peft_model_with_gptq_lora_model
+        replace_peft_model_with_gptq_lora_model()
         from peft import PeftModel
         from peft.tuners.lora import Linear4bitLt
         model = PeftModel.from_pretrained(model, lora_path, device_map={'': 'cpu'}, torch_dtype=torch.float32, is_trainable=True)
